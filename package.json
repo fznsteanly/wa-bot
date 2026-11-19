@@ -1,0 +1,1 @@
+{"dependencies":{"node-schedule":"^2.1.1","qrcode-terminal":"^0.12.0","whatsapp-web.js":"^1.26.0"},"description":"Bot WhatsApp otomatis: balas otomatis, perintah, dan pesan terjadwal (whatsapp-web.js)","main":"index.js","name":"wa-bot","scripts":{"start":"node index.js"},"type":"commonjs","version":"1.0.0"}
