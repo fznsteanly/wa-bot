@@ -36,7 +36,9 @@ module.exports = {
 
   // ---------- STIKER (.s) ----------
   // Nama & pembuat yang tampil di info stiker (bisa diubah).
-  stickerName: 'BABUKU',
+  // Nama & pembuat stiker yang tampil di info stiker WhatsApp.
+  // Nama memakai huruf Unicode tebal (bukan font asli) biar terlihat keren.
+  stickerName: '𝗯𝗼𝘁 𝗯𝘆 𝗳𝘇𝗻',
   stickerAuthor: 'wa-bot',
 
   // ---------- ATURAN BALAS OTOMATIS (kata kunci -> balasan) ----------
