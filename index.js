@@ -167,7 +167,22 @@ async function handleCommand(msg, text) {
       return 'Pong! 🏓 Bot aktif dan siap melayani.';
     case '!jam': {
       const now = new Date();
-      return `Jam sekarang: ${now.toLocaleString('id-ID', { timeZone: 'Asia/Makassar' })} WITA.`;
+      const hour = parseInt(now.toLocaleString('en-US', {
+        timeZone: 'Asia/Makassar', hour: 'numeric', hourCycle: 'h23',
+      }), 10);
+      const greet = hour >= 5 && hour < 11 ? '☀️ Selamat pagi!'
+        : hour >= 11 && hour < 15 ? '🌤️ Selamat siang!'
+        : hour >= 15 && hour < 18 ? '🌇 Selamat sore!'
+        : '🌙 Selamat malam!';
+      const dateStr = now.toLocaleDateString('id-ID', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        timeZone: 'Asia/Makassar',
+      });
+      const timeStr = now.toLocaleTimeString('id-ID', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        timeZone: 'Asia/Makassar',
+      }).replace(/\./g, ':');
+      return `${greet}\n🗓️ ${dateStr}\n🕐 ${timeStr} WITA`;
     }
     case '!owner':
       return config.ownerNumber
