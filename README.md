@@ -7,6 +7,12 @@ Bot WhatsApp berbasis [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-
 - **Balas otomatis** berdasarkan kata kunci (atur di `config.js`)
 - **Perintah**: `!menu`, `!ping`, `!jam`, `!owner`
 - **Stiker**: reply foto/video lalu ketik `.s` — bot mengubahnya jadi stiker (video pendek jadi stiker animasi)
+- **Stiker → foto**: reply stiker lalu ketik `.toimg`
+- **Anti view-once**: reply foto/video sekali lihat lalu ketik `.vo` — diubah jadi foto/video biasa
+- **Cuaca**: `.cuaca [kota]` — cuaca terkini (wttr.in, gratis)
+- **Jadwal sholat**: `.jadwalsholat [kota]` — jadwal sholat hari ini, metode Kemenag RI (Aladhan, gratis)
+- **Pengingat**: `.ingetin 30m minum obat` — bot mengingatkan setelah waktunya tiba
+- **Tag semua**: `.tagall [pesan]` — sebut semua anggota grup (khusus admin grup)
 - **Pesan terjadwal** (format cron, misal tiap hari jam 08:00)
 - **Cooldown** anti-spam per chat
 - Sesi tersimpan otomatis (QR cukup scan sekali)
@@ -29,6 +35,34 @@ sudo apt update && sudo apt install -y ffmpeg
 Reply foto/video sekali lihat lalu ketik `.vo` (atau `.lihat`) — bot mengunduh dan mengirim ulang medianya sebagai foto/video biasa.
 
 Konversi otomatis **nonaktif secara default**. Kalau mau setiap foto/video sekali lihat yang masuk langsung diubah otomatis tanpa perintah, atur `antiViewOnce: true` di `config.js`.
+
+## Stiker → foto (`.toimg`)
+
+Reply sebuah stiker lalu ketik `.toimg` — bot mengubahnya jadi foto biasa (WebP dikonversi ke JPG, butuh `ffmpeg`; kalau tidak ada ffmpeg, WebP asli tetap dikirim sebagai gambar).
+
+## Cuaca (`.cuaca`) & jadwal sholat (`.jadwalsholat`)
+
+- `.cuaca` — cuaca kota default (`defaultCity` di `config.js`, awalnya Palu)
+- `.cuaca Jakarta` — cuaca kota lain
+- `.jadwalsholat` / `.jadwalsholat Makassar` — jadwal sholat hari ini, metode Kemenag RI
+
+Keduanya memakai API gratis tanpa API key (wttr.in dan Aladhan). Butuh internet di server/HP yang menjalankan bot.
+
+## Pengingat (`.ingetin`)
+
+```
+.ingetin 30m minum obat      -> ingatkan 30 menit lagi
+.ingetin 1j30m berangkat     -> ingatkan 1 jam 30 menit lagi
+.ingetin 10s cek oven        -> ingatkan 10 detik lagi
+.ingetin list                -> lihat pengingat aktif
+.ingetin batal 1             -> batalkan pengingat nomor 1
+```
+
+Satuan waktu: `s` detik, `m` menit, `j` jam (boleh digabung, misal `1j30m`). Maksimal 24 jam. Catatan: pengingat tersimpan di memori — hilang kalau bot dimatikan/restart.
+
+## Tag semua anggota grup (`.tagall`)
+
+`.tagall` atau `.tagall ada pengumuman` — bot menyebut semua anggota grup. Hanya bisa dipakai di grup, hanya oleh admin grup (atau owner), dan hanya kalau `replyInGroups: true` di `config.js`.
 
 ## Cara pakai
 

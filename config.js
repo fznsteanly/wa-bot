@@ -13,6 +13,9 @@ module.exports = {
   // Kosongkan ('') kalau mau login dengan scan QR seperti biasa.
   botNumber: '',
 
+  // Kota default untuk .cuaca dan .jadwalsholat kalau tidak disebut kotanya.
+  defaultCity: 'Palu',
+
   // Balas otomatis di grup? false = bot cuma balas chat pribadi.
   // Nyalakan (true) kalau bot memang untuk grup.
   replyInGroups: false,
@@ -81,6 +84,11 @@ module.exports = {
     '*!jam* — lihat jam sekarang\n' +
     '*!owner* — info kontak owner\n' +
     '*.s* — ubah foto/video jadi stiker (reply foto lalu ketik *.s*)\n' +
-    '*.vo* — ubah foto/video sekali lihat jadi foto/video biasa\n\n' +
+    '*.toimg* — ubah stiker jadi foto lagi\n' +
+    '*.vo* — ubah foto/video sekali lihat jadi foto/video biasa\n' +
+    '*.cuaca [kota]* — cuaca terkini\n' +
+    '*.jadwalsholat [kota]* — jadwal sholat hari ini\n' +
+    '*.ingetin <waktu> <pesan>* — pengingat, misal *.ingetin 30m minum obat*\n' +
+    '*.tagall [pesan]* — sebut semua anggota grup (khusus admin)\n\n' +
     'Ketik kata kunci seperti *harga*, *lokasi*, atau *jam buka* untuk info cepat.',
 };
