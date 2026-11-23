@@ -24,6 +24,12 @@ Stiker video (animasi) butuh `ffmpeg` terinstal di server:
 sudo apt update && sudo apt install -y ffmpeg
 ```
 
+## Anti view-once (foto sekali lihat → foto biasa)
+
+Foto/video sekali lihat yang masuk **otomatis** dikirim ulang oleh bot sebagai foto/video biasa di chat yang sama. Matikan dengan `antiViewOnce: false` di `config.js`.
+
+Kalau konversi otomatis tidak sempat jalan (misal bot sedang offline saat medianya masuk), reply pesan sekali lihat itu lalu ketik `.vo` (atau `.lihat`) — bot akan mencoba mengunduh dan mengirim ulangnya.
+
 ## Cara pakai
 
 ```bash

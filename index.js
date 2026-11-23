@@ -1,8 +1,9 @@
 // ============================================================
 // WA-BOT — Bot WhatsApp otomatis (whatsapp-web.js)
 // Fitur: balas otomatis (kata kunci), perintah (!menu dll),
-//        stiker (.s — reply foto/video), pesan terjadwal,
-//        dan log sederhana.
+//        stiker (.s — reply foto/video),
+//        anti view-once (foto sekali lihat -> foto biasa),
+//        pesan terjadwal, dan log sederhana.
 // Jalankan: npm install  lalu  npm start  lalu scan QR di HP
 //           (atau pakai kode pairing — lihat config.botNumber).
 // Bisa jalan di VPS maupun di Termux (Android).
@@ -103,6 +104,43 @@ async function handleSticker(msg, text) {
   return null; // sudah dibalas langsung, tidak perlu balasan teks
 }
 
+// Kirim ulang sebuah media sebagai foto/video biasa (bukan sekali lihat).
+// Dipakai oleh konversi otomatis maupun perintah .vo.
+async function resendAsNormalMedia(msg, mediaMsg) {
+  const media = await mediaMsg.downloadMedia();
+  if (!media || !media.data) return false;
+  const isVideo = (media.mimetype || '').startsWith('video/');
+  await client.sendMessage(msg.from, media, {
+    caption: isVideo
+      ? '🎬 Video sekali lihat — disimpan sebagai video biasa'
+      : '📸 Foto sekali lihat — disimpan sebagai foto biasa',
+  });
+  log(`👁️ Media sekali lihat dikirim ulang sebagai ${isVideo ? 'video' : 'foto'} biasa ke ${msg.from}`);
+  return true;
+}
+
+// Perintah .vo / .lihat — reply ke foto/video sekali lihat untuk
+// mengubahnya jadi foto/video biasa (cadangan kalau konversi otomatis
+// tidak sempat jalan, misal bot sedang offline saat medianya masuk).
+async function handleViewOnceCommand(msg) {
+  let mediaMsg = null;
+  if (msg.hasQuotedMsg) {
+    try {
+      const quoted = await msg.getQuotedMessage();
+      if (quoted && quoted.hasMedia) mediaMsg = quoted;
+    } catch (e) {
+      log('⚠️ Gagal ambil pesan reply:', e.message);
+    }
+  }
+  if (!mediaMsg) {
+    return 'Caranya: *reply foto/video sekali lihat* lalu ketik *.vo*\n' +
+      'Bot akan mengirim ulang medianya sebagai foto/video biasa.';
+  }
+  const ok = await resendAsNormalMedia(msg, mediaMsg);
+  if (!ok) return 'Gagal mengunduh medianya — mungkin sudah tidak tersedia lagi.';
+  return null; // sudah dibalas langsung
+}
+
 const client = new Client({
   authStrategy: new LocalAuth(), // sesi tersimpan di .wwebjs_auth, QR cukup sekali
   puppeteer: {
@@ -155,6 +193,19 @@ client.on('message', async (msg) => {
     if (isGroup && !config.replyInGroups) return;
 
     const text = (msg.body || '').trim();
+
+    // Anti view-once otomatis: foto/video sekali lihat langsung dikirim
+    // ulang sebagai media biasa (pesan seperti ini tidak punya teks).
+    const isViewOnce = msg.rawData && msg.rawData.isViewOnce;
+    if (config.antiViewOnce && msg.hasMedia && isViewOnce) {
+      try {
+        await resendAsNormalMedia(msg, msg);
+      } catch (err) {
+        log('❌ Gagal konversi view-once:', err.message);
+      }
+      return;
+    }
+
     if (!text) return; // abaikan pesan tanpa teks (gambar/stiker/dokumen)
     if (isOnCooldown(msg.from)) return;
 
@@ -165,6 +216,13 @@ client.on('message', async (msg) => {
     if (firstWord === '.s' || firstWord === '.sticker' || firstWord === '.stiker') {
       // Perintah stiker membalas sendiri (kirim media), jadi selesai di sini
       reply = await handleSticker(msg, text);
+      if (reply === null) {
+        lastReplyAt.set(msg.from, Date.now());
+        return;
+      }
+    } else if (firstWord === '.vo' || firstWord === '.lihat') {
+      // Perintah view-once membalas sendiri (kirim media), jadi selesai di sini
+      reply = await handleViewOnceCommand(msg);
       if (reply === null) {
         lastReplyAt.set(msg.from, Date.now());
         return;

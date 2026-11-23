@@ -21,6 +21,12 @@ module.exports = {
   // Mencegah bot nge-spam kalau ada yang kirim banyak pesan.
   replyCooldownSeconds: 3,
 
+  // ---------- ANTI VIEW-ONCE ----------
+  // true = foto/video sekali lihat yang masuk otomatis dikirim ulang
+  // sebagai foto/video biasa di chat yang sama. Matikan (false) untuk
+  // menonaktifkan konversi otomatis (perintah .vo tetap bisa dipakai).
+  antiViewOnce: true,
+
   // ---------- STIKER (.s) ----------
   // Nama & pembuat yang tampil di info stiker (bisa diubah).
   stickerName: 'BABUKU',
@@ -73,6 +79,8 @@ module.exports = {
     '*!ping* — cek bot aktif atau tidak\n' +
     '*!jam* — lihat jam sekarang\n' +
     '*!owner* — info kontak owner\n' +
-    '*.s* — ubah foto/video jadi stiker (reply foto lalu ketik *.s*)\n\n' +
+    '*.s* — ubah foto/video jadi stiker (reply foto lalu ketik *.s*)\n' +
+    '*.vo* — ubah foto/video sekali lihat jadi foto/video biasa\n\n' +
+    'Foto/video sekali lihat juga otomatis diubah jadi biasa saat masuk.\n\n' +
     'Ketik kata kunci seperti *harga*, *lokasi*, atau *jam buka* untuk info cepat.',
 };
