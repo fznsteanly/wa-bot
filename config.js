@@ -15,6 +15,11 @@ module.exports = {
   // Mencegah bot nge-spam kalau ada yang kirim banyak pesan.
   replyCooldownSeconds: 3,
 
+  // ---------- STIKER (.s) ----------
+  // Nama & pembuat yang tampil di info stiker (bisa diubah).
+  stickerName: 'BABUKU',
+  stickerAuthor: 'wa-bot',
+
   // ---------- ATURAN BALAS OTOMATIS (kata kunci -> balasan) ----------
   // Bot cek apakah pesan MENGANDUNG kata kunci (tidak peduli huruf besar/kecil).
   // Aturan pertama yang cocok yang dipakai.
@@ -61,6 +66,7 @@ module.exports = {
     '*!menu* — tampilkan menu ini\n' +
     '*!ping* — cek bot aktif atau tidak\n' +
     '*!jam* — lihat jam sekarang\n' +
-    '*!owner* — info kontak owner\n\n' +
+    '*!owner* — info kontak owner\n' +
+    '*.s* — ubah foto/video jadi stiker (reply foto lalu ketik *.s*)\n\n' +
     'Ketik kata kunci seperti *harga*, *lokasi*, atau *jam buka* untuk info cepat.',
 };

@@ -1,8 +1,10 @@
 // ============================================================
 // WA-BOT — Bot WhatsApp otomatis (whatsapp-web.js)
 // Fitur: balas otomatis (kata kunci), perintah (!menu dll),
-//        pesan terjadwal, dan log sederhana.
+//        stiker (.s — reply foto/video), pesan terjadwal,
+//        dan log sederhana.
 // Jalankan: npm install  lalu  npm start  lalu scan QR di HP.
+// Catatan: stiker video (animasi) butuh ffmpeg terinstal di server.
 // ============================================================
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
@@ -54,6 +56,50 @@ async function handleCommand(msg, text) {
   }
 }
 
+// Ubah foto/video menjadi stiker.
+// Cara pakai: reply foto/video lalu ketik .s
+//   .s            -> stiker dengan nama dari config.js
+//   .s teks bebas -> stiker dengan nama "teks bebas"
+// Bisa juga kirim foto/video dengan caption .s (tanpa reply).
+// Foto -> stiker biasa, video/gif pendek -> stiker animasi
+// (stiker video butuh ffmpeg terinstal di server).
+async function handleSticker(msg, text) {
+  const customName = text.trim().split(/\s+/).slice(1).join(' ');
+
+  // Cari media: utamakan pesan yang di-reply, lalu media di pesan itu sendiri
+  let mediaMsg = null;
+  if (msg.hasQuotedMsg) {
+    try {
+      const quoted = await msg.getQuotedMessage();
+      if (quoted && quoted.hasMedia) mediaMsg = quoted;
+    } catch (e) {
+      log('⚠️ Gagal ambil pesan reply:', e.message);
+    }
+  }
+  if (!mediaMsg && msg.hasMedia) mediaMsg = msg;
+
+  if (!mediaMsg) {
+    return 'Caranya: *reply foto/video* lalu ketik *.s*\n' +
+      'Contoh: tahan foto > Reply > ketik *.s* > kirim.\n' +
+      'Bisa juga kirim foto dengan caption *.s*.';
+  }
+
+  const media = await mediaMsg.downloadMedia();
+  if (!media || !media.data) {
+    return 'Gagal mengunduh medianya. Coba kirim ulang fotonya lalu *.s* lagi ya.';
+  }
+
+  const isVideo = (media.mimetype || '').startsWith('video/');
+  await client.sendMessage(msg.from, media, {
+    sendMediaAsSticker: true,
+    stickerName: customName || config.stickerName,
+    stickerAuthor: config.stickerAuthor,
+    quotedMessageId: msg.id._serialized,
+  });
+  log(`🏷️ Stiker ${isVideo ? 'video' : 'foto'} dikirim ke ${msg.from}`);
+  return null; // sudah dibalas langsung, tidak perlu balasan teks
+}
+
 const client = new Client({
   authStrategy: new LocalAuth(), // sesi tersimpan di .wwebjs_auth, QR cukup sekali
   puppeteer: {
@@ -97,7 +143,17 @@ client.on('message', async (msg) => {
     log(`📩 ${isGroup ? '[grup] ' : ''}${msg.from}: ${text.slice(0, 120)}`);
 
     let reply = null;
-    if (text.startsWith('!')) reply = await handleCommand(msg, text);
+    const firstWord = text.split(/\s+/)[0].toLowerCase();
+    if (firstWord === '.s' || firstWord === '.sticker' || firstWord === '.stiker') {
+      // Perintah stiker membalas sendiri (kirim media), jadi selesai di sini
+      reply = await handleSticker(msg, text);
+      if (reply === null) {
+        lastReplyAt.set(msg.from, Date.now());
+        return;
+      }
+    } else if (text.startsWith('!')) {
+      reply = await handleCommand(msg, text);
+    }
     if (reply === null) reply = findAutoReply(text);
     if (reply === null) reply = config.fallbackReply || null;
 

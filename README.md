@@ -6,9 +6,23 @@ Bot WhatsApp berbasis [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-
 
 - **Balas otomatis** berdasarkan kata kunci (atur di `config.js`)
 - **Perintah**: `!menu`, `!ping`, `!jam`, `!owner`
+- **Stiker**: reply foto/video lalu ketik `.s` — bot mengubahnya jadi stiker (video pendek jadi stiker animasi)
 - **Pesan terjadwal** (format cron, misal tiap hari jam 08:00)
 - **Cooldown** anti-spam per chat
 - Sesi tersimpan otomatis (QR cukup scan sekali)
+
+## Stiker (`.s`)
+
+1. Reply sebuah foto atau video, lalu ketik `.s` dan kirim — bot membalas dengan stikernya.
+2. Bisa juga kirim foto/video dengan caption `.s` (tanpa reply).
+3. `.s` diikuti teks akan memakai teks itu sebagai nama stiker, misal `.s lucu banget`.
+4. Nama & pembuat default diatur di `config.js` (`stickerName`, `stickerAuthor`).
+
+Stiker video (animasi) butuh `ffmpeg` terinstal di server:
+
+```bash
+sudo apt update && sudo apt install -y ffmpeg
+```
 
 ## Cara pakai
 
