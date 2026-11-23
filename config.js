@@ -84,7 +84,8 @@ module.exports = {
 
   // ---------- TEKS MENU ----------
   menuText:
-    '🤖 *MENU BOT*\n\n' +
+    '🤖 *𝗙𝗭𝗡 𝗕𝗢𝗧*\n' +
+    '✦ ━━━ *MENU* ━━━ ✦\n\n' +
     '📌 *Perintah Dasar*\n' +
     '*!menu* — tampilkan menu ini\n' +
     '*!ping* — cek bot aktif atau tidak\n' +
