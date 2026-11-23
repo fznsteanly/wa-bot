@@ -44,6 +44,29 @@ Semua pengaturan ada di **`config.js`** — tidak perlu ubah `index.js`:
 - `fallbackReply`: balasan kalau tidak ada kata kunci yang cocok
 - `scheduledMessages`: pesan terjadwal (cron). ID grup: lihat dari log saat bot menerima pesan grup (`...@g.us`)
 
+## Menjalankan di Termux (Android) — BISA ✅
+
+Bot ini bisa jalan di Termux. Bot otomatis memakai Chromium Termux kalau tersedia.
+
+```bash
+pkg update && pkg upgrade
+pkg install nodejs git chromium ffmpeg
+git clone https://github.com/fznsteanly/wa-bot.git
+cd wa-bot
+npm install
+npm start
+```
+
+**Login tanpa scan QR (disarankan di Termux):** isi `botNumber` di `config.js` dengan nomor WhatsApp bot (format `62812...`), lalu `npm start` — bot menampilkan kode pairing 8 huruf. Masukkan kode itu di WhatsApp nomor bot: **titik tiga → Perangkat tertaut → Tautkan perangkat → Tautkan dengan nomor telepon**. Kalau `botNumber` dikosongkan, login tetap pakai scan QR (butuh HP kedua untuk scan).
+
+**Supaya bot tetap hidup di Termux:**
+
+```bash
+termux-wake-lock   # cegah HP tidur/mematikan Termux
+```
+
+Juga matikan optimasi baterai untuk Termux (Pengaturan → Aplikasi → Termux → Baterai → Tidak dibatasi). Catatan: bot mati kalau Termux ditutup/dimatikan Android atau HP kehabisan baterai — untuk 24/7 yang stabil, VPS tetap lebih baik.
+
 ## Menjalankan 24/7 (di VPS)
 
 Bot harus terus jalan supaya bisa membalas. Di VPS, pakai `pm2`:

@@ -3,10 +3,13 @@
 // Fitur: balas otomatis (kata kunci), perintah (!menu dll),
 //        stiker (.s — reply foto/video), pesan terjadwal,
 //        dan log sederhana.
-// Jalankan: npm install  lalu  npm start  lalu scan QR di HP.
-// Catatan: stiker video (animasi) butuh ffmpeg terinstal di server.
+// Jalankan: npm install  lalu  npm start  lalu scan QR di HP
+//           (atau pakai kode pairing — lihat config.botNumber).
+// Bisa jalan di VPS maupun di Termux (Android).
+// Catatan: stiker video (animasi) butuh ffmpeg terinstal.
 // ============================================================
 
+const fs = require('fs');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const schedule = require('node-schedule');
@@ -104,6 +107,10 @@ const client = new Client({
   authStrategy: new LocalAuth(), // sesi tersimpan di .wwebjs_auth, QR cukup sekali
   puppeteer: {
     headless: true,
+    // Termux tidak bisa memakai Chromium bawaan Puppeteer — pakai Chromium Termux
+    ...(fs.existsSync('/data/data/com.termux/files/usr/bin/chromium')
+      ? { executablePath: '/data/data/com.termux/files/usr/bin/chromium' }
+      : {}),
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -111,12 +118,23 @@ const client = new Client({
       '--disable-gpu',
     ],
   },
+  // Kalau botNumber diisi di config.js, login pakai kode pairing 8 huruf
+  // (tidak perlu scan QR — cocok untuk Termux di HP yang sama).
+  ...(config.botNumber
+    ? { pairWithPhoneNumber: { phoneNumber: config.botNumber } }
+    : {}),
 });
 
 client.on('qr', (qr) => {
   console.log('\n=== SCAN QR INI DENGAN WHATSAPP DI HP ===');
   console.log('(WhatsApp > titik tiga > Perangkat tertaut > Tautkan perangkat)\n');
   qrcode.generate(qr, { small: true });
+});
+
+client.on('code', (code) => {
+  console.log('\n=== KODE PAIRING (masukkan di WhatsApp bot) ===');
+  console.log(`\n        ${code}\n`);
+  console.log('(WhatsApp bot > titik tiga > Perangkat tertaut > Tautkan perangkat > Tautkan dengan nomor telepon)\n');
 });
 
 client.on('ready', () => {

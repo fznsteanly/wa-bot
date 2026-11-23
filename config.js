@@ -7,6 +7,12 @@ module.exports = {
   // Contoh Indonesia: 6281234567890
   ownerNumber: '',
 
+  // Nomor WhatsApp BOT itu sendiri (format sama seperti ownerNumber).
+  // Kalau diisi, login memakai KODE PAIRING 8 huruf (bukan scan QR) —
+  // cocok kalau bot jalan di Termux di HP yang sama dengan nomor bot.
+  // Kosongkan ('') kalau mau login dengan scan QR seperti biasa.
+  botNumber: '',
+
   // Balas otomatis di grup? false = bot cuma balas chat pribadi.
   // Nyalakan (true) kalau bot memang untuk grup.
   replyInGroups: false,
