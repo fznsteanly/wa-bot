@@ -97,7 +97,10 @@ module.exports = {
     '*.ingetin <waktu> <pesan>* — pengingat, misal *.ingetin 30m minum obat*\n' +
     '*.tagall [pesan]* — sebut semua anggota grup (khusus admin)\n\n' +
     '📣 *Broadcast*\n' +
-    '*.bc <pesan>* — kirim promosi ke semua grup (jeda 1 menit, khusus owner)\n\n' +
+    '*.bc <pesan>* — siapkan promosi ke semua grup (khusus owner)\n' +
+    '*.bc kirim* — mulai kirim, jeda 1 menit per grup\n' +
+    '*.bc status* — lihat progres broadcast\n' +
+    '*.bc batal* — batalkan broadcast\n\n' +
     '⚙️ *Otomatis*\n' +
     'Bot membalas otomatis kata kunci seperti *harga*, *lokasi*, dan *jam buka*.',
 };
