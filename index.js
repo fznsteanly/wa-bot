@@ -5,6 +5,7 @@
 //        anti view-once (.vo), cuaca (.cuaca),
 //        jadwal sholat (.jadwalsholat), pengingat (.ingetin),
 //        tag semua anggota grup (.tagall),
+//        broadcast promosi ke semua grup (.bc, khusus owner),
 //        pesan terjadwal, dan log sederhana.
 // Jalankan: npm install  lalu  npm start  lalu scan QR di HP
 //           (atau pakai kode pairing — lihat config.botNumber).
@@ -389,6 +390,90 @@ async function handleRemind(msg, argsText) {
   return `Siap, kuingetin ${formatDuration(ms)} lagi: ${text} ⏰`;
 }
 
+// ---------- BROADCAST (.bc) ----------
+// .bc <pesan>  -> simpan pesan, tampilkan pratinjau + daftar grup, minta konfirmasi
+// .bc kirim    -> mulai kirim ke semua grup bot, jeda broadcastDelaySec per grup
+// .bc batal    -> batalkan broadcast (yang tertunda / sedang berjalan)
+// .bc status   -> lihat progres broadcast yang sedang berjalan
+// Hanya owner (config.ownerNumber) yang bisa memakai perintah ini, dan
+// hanya lewat chat pribadi dengan bot.
+// ⚠️ Broadcast massal melanggar ketentuan WhatsApp — nomor bot tetap
+// berisiko diblokir meski ada jeda. Pakai seperlunya saja.
+const broadcast = { pending: null, queue: [], index: 0, sent: 0, failed: 0, timer: null, ownerChat: null };
+
+function broadcastDelayMs() {
+  return (config.broadcastDelaySec || 60) * 1000;
+}
+
+async function handleBroadcast(msg, argsText) {
+  if (msg.from.endsWith('@g.us')) return 'Perintah .bc hanya bisa dipakai di chat pribadi dengan bot.';
+  if (!config.ownerNumber) return 'Nomor owner belum diatur di config.js (ownerNumber).';
+  if (msg.from !== `${config.ownerNumber}@c.us`) return 'Perintah ini hanya bisa dipakai owner bot.';
+  const args = (argsText || '').trim();
+  const sub = args.toLowerCase();
+  const delaySec = config.broadcastDelaySec || 60;
+
+  if (sub === 'batal') {
+    if (broadcast.timer) clearTimeout(broadcast.timer);
+    const wasActive = broadcast.timer !== null || broadcast.pending !== null || broadcast.queue.length > 0;
+    broadcast.pending = null; broadcast.queue = []; broadcast.timer = null;
+    return wasActive ? 'Broadcast dibatalkan.' : 'Tidak ada broadcast yang berjalan.';
+  }
+  if (sub === 'status') {
+    if (broadcast.pending) {
+      return `Broadcast tertunda, menunggu konfirmasi *.bc kirim*.\nPesan: ${broadcast.pending.slice(0, 100)}${broadcast.pending.length > 100 ? '…' : ''}`;
+    }
+    if (broadcast.queue.length === 0) return 'Tidak ada broadcast yang berjalan.';
+    return `Broadcast berjalan: ${broadcast.sent + broadcast.failed}/${broadcast.queue.length} grup sudah diproses (${broadcast.sent} terkirim, ${broadcast.failed} gagal).`;
+  }
+  if (sub === 'kirim') {
+    if (!broadcast.pending) return 'Tidak ada pesan broadcast yang tertunda. Ketik *.bc <pesan>* dulu.';
+    const chats = await client.getChats();
+    const groups = chats.filter((c) => c.isGroup);
+    if (groups.length === 0) { broadcast.pending = null; return 'Bot tidak ada di grup mana pun.'; }
+    const text = broadcast.pending;
+    broadcast.pending = null;
+    broadcast.queue = groups; broadcast.index = 0; broadcast.sent = 0; broadcast.failed = 0;
+    broadcast.ownerChat = msg.from;
+    sendNextBroadcast(text); // grup pertama langsung, sisanya tiap jeda
+    return `Broadcast dimulai: ${groups.length} grup, jeda ${delaySec} detik per pesan.\nKetik *.bc status* untuk progres, *.bc batal* untuk membatalkan.`;
+  }
+  if (!args) {
+    return 'Cara pakai: *.bc <pesan promosi>*\n' +
+      'Bot menampilkan pratinjau + jumlah grup, lalu ketik *.bc kirim* untuk mulai.\n' +
+      `Pesan dikirim ke semua grup bot, jeda ${delaySec} detik per grup.\n` +
+      '⚠️ Broadcast massal bisa menyebabkan nomor bot diblokir WhatsApp — pakai seperlunya.';
+  }
+  broadcast.pending = args;
+  const chats = await client.getChats();
+  const groups = chats.filter((c) => c.isGroup);
+  const names = groups.slice(0, 10).map((g) => `• ${g.name || g.id._serialized}`).join('\n');
+  const more = groups.length > 10 ? `\n…dan ${groups.length - 10} grup lainnya` : '';
+  return `📣 *Pratinjau broadcast*\n\n${args}\n\nAkan dikirim ke *${groups.length} grup* (jeda ${delaySec} detik):\n${names}${more}\n\nKetik *.bc kirim* untuk mulai, *.bc batal* untuk membatalkan.`;
+}
+
+async function sendNextBroadcast(text) {
+  const group = broadcast.queue[broadcast.index];
+  broadcast.index += 1;
+  try {
+    await client.sendMessage(group.id._serialized, text);
+    broadcast.sent += 1;
+    log(`📣 Broadcast terkirim ke ${group.name || group.id._serialized} (${broadcast.sent}/${broadcast.queue.length})`);
+  } catch (err) {
+    broadcast.failed += 1;
+    log(`❌ Broadcast gagal ke ${group.name || group.id._serialized}:`, err.message);
+  }
+  if (broadcast.index >= broadcast.queue.length) {
+    const total = broadcast.queue.length;
+    const done = `Broadcast selesai: ${broadcast.sent}/${total} grup terkirim${broadcast.failed ? `, ${broadcast.failed} gagal` : ''}.`;
+    broadcast.queue = []; broadcast.timer = null;
+    try { await client.sendMessage(broadcast.ownerChat, `📣 ${done}`); } catch (e) { log('❌ Gagal kirim laporan broadcast:', e.message); }
+    log(`📣 ${done}`);
+    return;
+  }
+  broadcast.timer = setTimeout(() => sendNextBroadcast(text), broadcastDelayMs());
+}
+
 // Perintah .tagall [pesan] — sebut semua anggota grup (khusus admin grup).
 // Hanya jalan di grup dan hanya jika replyInGroups aktif di config.
 async function handleTagAll(msg, text) {
@@ -522,6 +607,8 @@ client.on('message', async (msg) => {
         lastReplyAt.set(msg.from, Date.now());
         return;
       }
+    } else if (firstWord === '.bc') {
+      reply = await handleBroadcast(msg, text.split(/\s+/).slice(1).join(' '));
     } else if (text.startsWith('!')) {
       reply = await handleCommand(msg, text);
     }

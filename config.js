@@ -16,6 +16,9 @@ module.exports = {
   // Kota default untuk .cuaca dan .jadwalsholat kalau tidak disebut kotanya.
   defaultCity: 'Palu',
 
+  // Jeda antar pesan broadcast (.bc), dalam detik. 60 = 1 menit per grup.
+  broadcastDelaySec: 60,
+
   // Balas otomatis di grup? false = bot cuma balas chat pribadi.
   // Nyalakan (true) kalau bot memang untuk grup.
   replyInGroups: false,
@@ -93,6 +96,8 @@ module.exports = {
     '*.jadwalsholat [kota]* — jadwal sholat hari ini\n' +
     '*.ingetin <waktu> <pesan>* — pengingat, misal *.ingetin 30m minum obat*\n' +
     '*.tagall [pesan]* — sebut semua anggota grup (khusus admin)\n\n' +
+    '👑 *Khusus Owner*\n' +
+    '*.bc <pesan>* — broadcast promosi ke semua grup (jeda 1 menit)\n\n' +
     '⚙️ *Otomatis*\n' +
     'Bot membalas otomatis kata kunci seperti *harga*, *lokasi*, dan *jam buka*.',
 };

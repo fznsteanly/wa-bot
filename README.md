@@ -13,6 +13,7 @@ Bot WhatsApp berbasis [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-
 - **Jadwal sholat**: `.jadwalsholat [kota]` — jadwal sholat hari ini, metode Kemenag RI (Aladhan, gratis)
 - **Pengingat**: `.ingetin 30m minum obat` — bot mengingatkan setelah waktunya tiba
 - **Tag semua**: `.tagall [pesan]` — sebut semua anggota grup (khusus admin grup)
+- **Broadcast**: `.bc <pesan>` — kirim promosi ke semua grup bot, jeda 1 menit per grup (khusus owner)
 - **Pesan terjadwal** (format cron, misal tiap hari jam 08:00)
 - **Cooldown** anti-spam per chat
 - Sesi tersimpan otomatis (QR cukup scan sekali)
@@ -63,6 +64,23 @@ Satuan waktu: `s` detik, `m` menit, `j` jam (boleh digabung, misal `1j30m`). Mak
 ## Tag semua anggota grup (`.tagall`)
 
 `.tagall` atau `.tagall ada pengumuman` — bot menyebut semua anggota grup. Hanya bisa dipakai di grup, hanya oleh admin grup (atau owner), dan hanya kalau `replyInGroups: true` di `config.js`.
+
+## Broadcast promosi (`.bc`) — khusus owner
+
+Kirim pesan promosi ke **semua grup** yang diikuti bot, satu per satu dengan jeda (default 1 menit per grup, atur di `broadcastDelaySec`).
+
+```
+.bc Promo diskon 20% hari ini!     -> tampilkan pratinjau + daftar grup
+.bc kirim                           -> mulai kirim
+.bc status                          -> lihat progres
+.bc batal                           -> batalkan
+```
+
+Alurnya: ketik `.bc <pesan>` dulu — bot menampilkan pratinjau dan jumlah grup — lalu konfirmasi dengan `.bc kirim`. Grup pertama dikirim langsung, grup berikutnya tiap jeda. Setelah selesai, bot mengirim laporan ke owner (berapa terkirim/gagal).
+
+Hanya owner (`ownerNumber` di `config.js`) yang bisa memakai perintah ini, dan hanya lewat chat pribadi dengan bot.
+
+⚠️ **Peringatan:** broadcast massal melanggar ketentuan WhatsApp. Jeda 1 menit mengurangi risiko, tapi tidak menghilangkan — nomor bot tetap bisa diblokir, dan grup bisa mengeluarkan bot. Pakai seperlunya, dan hanya ke grup yang memang mengizinkan promosi.
 
 ## Cara pakai
 
