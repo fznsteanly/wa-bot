@@ -186,8 +186,8 @@ async function handleCommand(msg, text) {
     }
     case '!owner':
       return config.ownerNumber
-        ? `Owner: +${config.ownerNumber}`
-        : 'Kontak owner belum diatur di config.js.';
+        ? `👑 *Owner Bot*\n📱 +${config.ownerNumber}\n💬 https://wa.me/${config.ownerNumber}`
+        : '⚠️ Kontak owner belum diatur di config.js.';
     default:
       return null; // perintah tidak dikenal -> lanjut ke aturan biasa
   }
