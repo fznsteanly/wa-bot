@@ -96,8 +96,8 @@ module.exports = {
     '*.jadwalsholat [kota]* — jadwal sholat hari ini\n' +
     '*.ingetin <waktu> <pesan>* — pengingat, misal *.ingetin 30m minum obat*\n' +
     '*.tagall [pesan]* — sebut semua anggota grup (khusus admin)\n\n' +
-    '👑 *Khusus Owner*\n' +
-    '*.bc <pesan>* — broadcast promosi ke semua grup (jeda 1 menit)\n\n' +
+    '📣 *Broadcast*\n' +
+    '*.bc <pesan>* — kirim promosi ke semua grup (jeda 1 menit, khusus owner)\n\n' +
     '⚙️ *Otomatis*\n' +
     'Bot membalas otomatis kata kunci seperti *harga*, *lokasi*, dan *jam buka*.',
 };
