@@ -79,16 +79,20 @@ module.exports = {
   // ---------- TEKS MENU ----------
   menuText:
     '🤖 *MENU BOT*\n\n' +
+    '📌 *Perintah Dasar*\n' +
     '*!menu* — tampilkan menu ini\n' +
     '*!ping* — cek bot aktif atau tidak\n' +
     '*!jam* — lihat jam sekarang\n' +
-    '*!owner* — info kontak owner\n' +
+    '*!owner* — info kontak owner\n\n' +
+    '🎬 *Media*\n' +
     '*.s* — ubah foto/video jadi stiker (reply foto lalu ketik *.s*)\n' +
     '*.toimg* — ubah stiker jadi foto lagi\n' +
-    '*.vo* — ubah foto/video sekali lihat jadi foto/video biasa\n' +
+    '*.vo* — ubah foto/video sekali lihat jadi foto/video biasa\n\n' +
+    'ℹ️ *Info & Utilitas*\n' +
     '*.cuaca [kota]* — cuaca terkini\n' +
     '*.jadwalsholat [kota]* — jadwal sholat hari ini\n' +
     '*.ingetin <waktu> <pesan>* — pengingat, misal *.ingetin 30m minum obat*\n' +
     '*.tagall [pesan]* — sebut semua anggota grup (khusus admin)\n\n' +
-    'Ketik kata kunci seperti *harga*, *lokasi*, atau *jam buka* untuk info cepat.',
+    '⚙️ *Otomatis*\n' +
+    'Bot membalas otomatis kata kunci seperti *harga*, *lokasi*, dan *jam buka*.',
 };
