@@ -120,8 +120,8 @@ async function resendAsNormalMedia(msg, mediaMsg) {
 }
 
 // Perintah .vo / .lihat — reply ke foto/video sekali lihat untuk
-// mengubahnya jadi foto/video biasa (cadangan kalau konversi otomatis
-// tidak sempat jalan, misal bot sedang offline saat medianya masuk).
+// mengubahnya jadi foto/video biasa. Ini cara utama memakai fitur
+// anti view-once (konversi otomatis nonaktif secara default).
 async function handleViewOnceCommand(msg) {
   let mediaMsg = null;
   if (msg.hasQuotedMsg) {

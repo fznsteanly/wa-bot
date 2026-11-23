@@ -22,10 +22,11 @@ module.exports = {
   replyCooldownSeconds: 3,
 
   // ---------- ANTI VIEW-ONCE ----------
-  // true = foto/video sekali lihat yang masuk otomatis dikirim ulang
-  // sebagai foto/video biasa di chat yang sama. Matikan (false) untuk
-  // menonaktifkan konversi otomatis (perintah .vo tetap bisa dipakai).
-  antiViewOnce: true,
+  // false (default) = foto/video sekali lihat TIDAK diubah otomatis;
+  // ubahnya hanya lewat perintah .vo (reply pesan sekali lihat).
+  // true = setiap foto/video sekali lihat yang masuk otomatis dikirim
+  // ulang sebagai foto/video biasa di chat yang sama.
+  antiViewOnce: false,
 
   // ---------- STIKER (.s) ----------
   // Nama & pembuat yang tampil di info stiker (bisa diubah).
@@ -81,6 +82,5 @@ module.exports = {
     '*!owner* — info kontak owner\n' +
     '*.s* — ubah foto/video jadi stiker (reply foto lalu ketik *.s*)\n' +
     '*.vo* — ubah foto/video sekali lihat jadi foto/video biasa\n\n' +
-    'Foto/video sekali lihat juga otomatis diubah jadi biasa saat masuk.\n\n' +
     'Ketik kata kunci seperti *harga*, *lokasi*, atau *jam buka* untuk info cepat.',
 };

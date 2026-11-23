@@ -26,9 +26,9 @@ sudo apt update && sudo apt install -y ffmpeg
 
 ## Anti view-once (foto sekali lihat → foto biasa)
 
-Foto/video sekali lihat yang masuk **otomatis** dikirim ulang oleh bot sebagai foto/video biasa di chat yang sama. Matikan dengan `antiViewOnce: false` di `config.js`.
+Reply foto/video sekali lihat lalu ketik `.vo` (atau `.lihat`) — bot mengunduh dan mengirim ulang medianya sebagai foto/video biasa.
 
-Kalau konversi otomatis tidak sempat jalan (misal bot sedang offline saat medianya masuk), reply pesan sekali lihat itu lalu ketik `.vo` (atau `.lihat`) — bot akan mencoba mengunduh dan mengirim ulangnya.
+Konversi otomatis **nonaktif secara default**. Kalau mau setiap foto/video sekali lihat yang masuk langsung diubah otomatis tanpa perintah, atur `antiViewOnce: true` di `config.js`.
 
 ## Cara pakai
 
