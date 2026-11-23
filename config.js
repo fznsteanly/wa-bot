@@ -65,8 +65,9 @@ module.exports = {
     },
   ],
 
-  // Balasan kalau pesan tidak cocok aturan apa pun (kosongkan '' = tidak balas).
-  fallbackReply: 'Maaf, saya bot otomatis dan belum paham pesan itu. Ketik *!menu* untuk lihat yang bisa saya bantu.',
+  // Balasan kalau pesan tidak cocok aturan apa pun.
+  // Kosong ('') = bot diam saja, tidak membalas pesan yang tidak dimengerti.
+  fallbackReply: '',
 
   // ---------- PESAN TERJADWAL ----------
   // schedule: format cron "menit jam tanggal bulan hari-minggu"
