@@ -4,7 +4,7 @@
 //        stiker (.s), stiker -> foto (.toimg),
 //        anti view-once (.vo), cuaca (.cuaca),
 //        jadwal sholat (.jadwalsholat), pengingat (.ingetin),
-//        tag semua anggota grup (.tagall),
+//        tag semua anggota grup (.tagall), stiker audio (.audio),
 //        broadcast promosi ke semua grup (.bc, khusus owner),
 //        pesan terjadwal, dan log sederhana.
 // Jalankan: npm install  lalu  npm start  lalu scan QR di HP
@@ -501,6 +501,118 @@ async function handleTagAll(msg, text) {
   return null; // sudah dibalas langsung
 }
 
+// ---------- STIKER AUDIO (.audio) ----------
+// Stiker audio = potongan suara pendek yang disimpan dengan nama, lalu
+// dikirim ulang sebagai pesan suara (voice note) kapan pun dipanggil.
+// WhatsApp tidak punya format "stiker audio" khusus — ini cara bot
+// menirunya: audio disimpan sebagai .ogg (opus, format pesan suara).
+// .audio simpan <nama>  -> reply pesan suara/audio untuk menyimpannya
+// .audio <nama>         -> kirim stiker audio itu sebagai pesan suara
+// .audio list           -> daftar stiker audio tersimpan
+// .audio hapus <nama>   -> hapus (khusus owner)
+// File tersimpan di folder audio-stickers/ (tidak ikut ke Git).
+// Menyimpan audio non-ogg butuh ffmpeg terinstal (konversi ke opus).
+const AUDIO_STICKER_DIR = path.join(__dirname, 'audio-stickers');
+
+function audioStickerTarget(rawName) {
+  const safe = (rawName || '').toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/^-+|-+$/g, '');
+  if (!safe) return null;
+  return { name: safe, file: path.join(AUDIO_STICKER_DIR, `${safe}.ogg`) };
+}
+
+function listAudioStickers() {
+  try {
+    return fs.readdirSync(AUDIO_STICKER_DIR)
+      .filter((f) => f.endsWith('.ogg'))
+      .map((f) => f.slice(0, -4))
+      .sort();
+  } catch (e) {
+    return [];
+  }
+}
+
+// Konversi file audio apa pun ke .ogg opus (format voice note WhatsApp)
+function convertToOgg(input, output) {
+  return new Promise((resolve) => {
+    execFile('ffmpeg', ['-y', '-v', 'error', '-i', input, '-vn', '-c:a', 'libopus', '-b:a', '32k', '-ar', '48000', '-ac', '1', output], (err) => {
+      resolve(!err && fs.existsSync(output));
+    });
+  });
+}
+
+async function handleAudioSticker(msg, argsText) {
+  const args = (argsText || '').trim();
+  const parts = args.split(/\s+/).filter(Boolean);
+  const sub = (parts[0] || '').toLowerCase();
+
+  if (!args || sub === 'help') {
+    return '🔊 *Stiker Audio*\n' +
+      '*.audio simpan <nama>* — reply pesan suara/audio untuk menyimpannya\n' +
+      '*.audio <nama>* — kirim stiker audio sebagai pesan suara\n' +
+      '*.audio list* — daftar stiker audio tersimpan\n' +
+      '*.audio hapus <nama>* — hapus stiker audio (khusus owner)';
+  }
+  if (sub === 'list') {
+    const names = listAudioStickers();
+    if (names.length === 0) return 'Belum ada stiker audio tersimpan. Reply pesan suara lalu ketik *.audio simpan <nama>*.';
+    return `🔊 *Stiker audio tersimpan:*\n${names.map((n) => `• ${n}`).join('\n')}\n\nKirim dengan *.audio <nama>*`;
+  }
+  if (sub === 'simpan' || sub === 'save') {
+    const target = audioStickerTarget(parts.slice(1).join(' '));
+    if (!target) return 'Kasih nama dulu ya. Contoh: *.audio simpan ketawa*';
+    const mediaMsg = await findMediaMessage(msg);
+    if (!mediaMsg) return 'Caranya: *reply pesan suara/audio* lalu ketik *.audio simpan <nama>*';
+    const media = await mediaMsg.downloadMedia();
+    if (!media || !media.data) return 'Gagal mengunduh audionya. Coba kirim ulang ya.';
+    if (!(media.mimetype || '').startsWith('audio/')) return 'Itu bukan audio. Reply pesan suara atau file audio ya.';
+    fs.mkdirSync(AUDIO_STICKER_DIR, { recursive: true });
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wabot-audio-'));
+    try {
+      const ext = ((media.mimetype.split('/')[1] || 'bin').split(';')[0] || 'bin').replace(/[^a-z0-9]/gi, '');
+      const rawFile = path.join(tmp, `in.${ext}`);
+      fs.writeFileSync(rawFile, Buffer.from(media.data, 'base64'));
+      let ok;
+      if ((media.mimetype || '').includes('ogg')) {
+        fs.copyFileSync(rawFile, target.file);
+        ok = true;
+      } else {
+        ok = await convertToOgg(rawFile, target.file);
+        if (!ok && fs.existsSync(target.file)) fs.rmSync(target.file);
+      }
+      if (!ok) return 'Gagal menyimpan: konversi audio butuh *ffmpeg* terinstal di perangkat bot.';
+      log(`🔊 Stiker audio disimpan: ${target.name}`);
+      return `Siap! Stiker audio *${target.name}* tersimpan. Kirim kapan saja dengan *.audio ${target.name}*`;
+    } finally {
+      try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
+    }
+  }
+  if (sub === 'hapus' || sub === 'delete') {
+    const isOwner = config.ownerNumber &&
+      (msg.from === `${config.ownerNumber}@c.us` || (msg.author || '').startsWith(config.ownerNumber));
+    if (!isOwner) return 'Hapus stiker audio cuma bisa dilakukan owner bot.';
+    const target = audioStickerTarget(parts.slice(1).join(' '));
+    if (!target) return 'Sebutkan namanya. Contoh: *.audio hapus ketawa*';
+    if (!fs.existsSync(target.file)) return `Stiker audio *${target.name}* tidak ditemukan.`;
+    fs.rmSync(target.file);
+    return `Stiker audio *${target.name}* dihapus.`;
+  }
+  // Default: kirim stiker audio dengan nama itu
+  const target = audioStickerTarget(args);
+  if (!target) return 'Format tidak dikenali. Ketik *.audio* untuk bantuan.';
+  if (!fs.existsSync(target.file)) {
+    const names = listAudioStickers();
+    return `Stiker audio *${target.name}* tidak ada.` + (names.length ? `\nYang tersimpan: ${names.join(', ')}` : '');
+  }
+  const data = fs.readFileSync(target.file).toString('base64');
+  const media = new MessageMedia('audio/ogg; codecs=opus', data, `${target.name}.ogg`);
+  await client.sendMessage(msg.from, media, {
+    sendAudioAsVoice: true,
+    quotedMessageId: msg.id._serialized,
+  });
+  log(`🔊 Stiker audio terkirim: ${target.name} ke ${msg.from}`);
+  return null; // sudah dibalas langsung
+}
+
 const client = new Client({
   authStrategy: new LocalAuth(), // sesi tersimpan di .wwebjs_auth, QR cukup sekali
   puppeteer: {
@@ -603,6 +715,13 @@ client.on('message', async (msg) => {
     } else if (firstWord === '.tagall' || firstWord === '.tag') {
       // Perintah tagall membalas sendiri (kirim mention), jadi selesai di sini
       reply = await handleTagAll(msg, text);
+      if (reply === null) {
+        lastReplyAt.set(msg.from, Date.now());
+        return;
+      }
+    } else if (firstWord === '.audio') {
+      // Perintah stiker audio membalas sendiri saat mengirim suara
+      reply = await handleAudioSticker(msg, text.split(/\s+/).slice(1).join(' '));
       if (reply === null) {
         lastReplyAt.set(msg.from, Date.now());
         return;

@@ -9,6 +9,7 @@ Bot WhatsApp berbasis [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-
 - **Stiker**: reply foto/video lalu ketik `.s` — bot mengubahnya jadi stiker (video pendek jadi stiker animasi)
 - **Stiker → foto**: reply stiker lalu ketik `.toimg`
 - **Anti view-once**: reply foto/video sekali lihat lalu ketik `.vo` — diubah jadi foto/video biasa
+- **Stiker audio**: `.audio` — simpan pesan suara dengan nama, kirim ulang sebagai pesan suara kapan pun
 - **Cuaca**: `.cuaca [kota]` — cuaca terkini (wttr.in, gratis)
 - **Jadwal sholat**: `.jadwalsholat [kota]` — jadwal sholat hari ini, metode Kemenag RI (Aladhan, gratis)
 - **Pengingat**: `.ingetin 30m minum obat` — bot mengingatkan setelah waktunya tiba
@@ -40,6 +41,17 @@ Konversi otomatis **nonaktif secara default**. Kalau mau setiap foto/video sekal
 ## Stiker → foto (`.toimg`)
 
 Reply sebuah stiker lalu ketik `.toimg` — bot mengubahnya jadi foto biasa (WebP dikonversi ke JPG, butuh `ffmpeg`; kalau tidak ada ffmpeg, WebP asli tetap dikirim sebagai gambar).
+
+## Stiker audio (`.audio`)
+
+WhatsApp tidak punya format stiker audio khusus — fitur ini menirunya: potongan suara disimpan dengan nama, lalu dikirim ulang sebagai **pesan suara** (voice note).
+
+- Reply sebuah pesan suara/audio lalu ketik `.audio simpan ketawa` — suara itu tersimpan dengan nama `ketawa`.
+- Ketik `.audio ketawa` di chat mana pun — bot mengirim suaranya sebagai pesan suara.
+- `.audio list` — lihat semua stiker audio tersimpan.
+- `.audio hapus ketawa` — hapus (khusus owner).
+
+Audio disimpan sebagai `.ogg` (opus) di folder `audio-stickers/` (tidak ikut ke Git). Pesan suara WhatsApp memang sudah `.ogg`; file audio lain (mp3 dll) dikonversi otomatis — konversi butuh `ffmpeg` terinstal.
 
 ## Cuaca (`.cuaca`) & jadwal sholat (`.jadwalsholat`)
 
