@@ -10,6 +10,7 @@ Bot WhatsApp berbasis [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-
 - **Stiker → foto**: reply stiker lalu ketik `.toimg`
 - **Anti view-once**: reply foto/video sekali lihat lalu ketik `.vo` — diubah jadi foto/video biasa
 - **Stiker audio**: `.audio` — simpan pesan suara dengan nama, kirim ulang sebagai pesan suara kapan pun
+- **Stiker video bersuara**: `.vstiker` — simpan video dengan nama, kirim ulang sebagai video pendek bersuara kapan pun
 - **Cuaca**: `.cuaca [kota]` — cuaca terkini (wttr.in, gratis)
 - **Jadwal sholat**: `.jadwalsholat [kota]` — jadwal sholat hari ini, metode Kemenag RI (Aladhan, gratis)
 - **Pengingat**: `.ingetin 30m minum obat` — bot mengingatkan setelah waktunya tiba
@@ -52,6 +53,17 @@ WhatsApp tidak punya format stiker audio khusus — fitur ini menirunya: potonga
 - `.audio hapus ketawa` — hapus (khusus owner).
 
 Audio disimpan sebagai `.ogg` (opus) di folder `audio-stickers/` (tidak ikut ke Git). Pesan suara WhatsApp memang sudah `.ogg`; file audio lain (mp3 dll) dikonversi otomatis — konversi butuh `ffmpeg` terinstal.
+
+## Stiker video bersuara (`.vstiker`)
+
+Stiker WhatsApp asli (WebP, termasuk yang animasi/bergerak) **tidak bisa berisi suara** — format stiker memang gambar, tidak ada jalur audionya. Fitur ini menirunya dengan video pendek yang disimpan dan dikirim ulang sebagai pesan video, jadi gambar **dan** suaranya tetap ada.
+
+- Reply sebuah video lalu ketik `.vstiker simpan ngakak` — video tersimpan dengan nama `ngakak`.
+- Ketik `.vstiker ngakak` di chat mana pun — bot mengirim videonya.
+- `.vstiker list` — lihat semua stiker video tersimpan.
+- `.vstiker hapus ngakak` — hapus (khusus owner).
+
+Saat disimpan, video diolah pakai `ffmpeg` (wajib terinstal): dipotong persegi 512x512 (crop tengah), maksimal 15 detik, video H.264 + audio AAC. File tersimpan di folder `video-stickers/` (tidak ikut ke Git).
 
 ## Cuaca (`.cuaca`) & jadwal sholat (`.jadwalsholat`)
 

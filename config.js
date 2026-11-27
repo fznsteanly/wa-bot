@@ -96,7 +96,9 @@ module.exports = {
     '*.toimg* — ubah stiker jadi foto lagi\n' +
     '*.vo* — ubah foto/video sekali lihat jadi foto/video biasa\n' +
     '*.audio simpan <nama>* — simpan pesan suara jadi stiker audio\n' +
-    '*.audio <nama>* — kirim stiker audio sebagai pesan suara\n\n' +
+    '*.audio <nama>* — kirim stiker audio sebagai pesan suara\n' +
+    '*.vstiker simpan <nama>* — simpan video jadi stiker video bersuara\n' +
+    '*.vstiker <nama>* — kirim stiker video (gambar + suara)\n\n' +
     'ℹ️ *Info & Utilitas*\n' +
     '*.cuaca [kota]* — cuaca terkini\n' +
     '*.jadwalsholat [kota]* — jadwal sholat hari ini\n' +

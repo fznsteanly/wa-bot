@@ -5,6 +5,7 @@
 //        anti view-once (.vo), cuaca (.cuaca),
 //        jadwal sholat (.jadwalsholat), pengingat (.ingetin),
 //        tag semua anggota grup (.tagall), stiker audio (.audio),
+//        stiker video bersuara (.vstiker),
 //        broadcast promosi ke semua grup (.bc, khusus owner),
 //        pesan terjadwal, dan log sederhana.
 // Jalankan: npm install  lalu  npm start  lalu scan QR di HP
@@ -613,6 +614,134 @@ async function handleAudioSticker(msg, argsText) {
   return null; // sudah dibalas langsung
 }
 
+// ---------- STIKER VIDEO BERSUARA (.vstiker) ----------
+// Stiker WhatsApp asli (WebP, termasuk yang animasi) TIDAK BISA berisi
+// suara — formatnya memang gambar, tidak ada jalur audio. Jadi fitur
+// ini menirunya dengan video pendek: video disimpan dengan nama,
+// dipotong persegi 512x512 dan maksimal 15 detik (suara dipertahankan),
+// lalu dikirim ulang sebagai pesan video kapan pun dipanggil.
+// .vstiker simpan <nama>  -> reply video untuk menyimpannya
+// .vstiker <nama>         -> kirim stiker video itu (gambar + suara)
+// .vstiker list           -> daftar stiker video tersimpan
+// .vstiker hapus <nama>   -> hapus (khusus owner)
+// File tersimpan di folder video-stickers/ (tidak ikut ke Git).
+// Pengolahan video butuh ffmpeg terinstal.
+const VIDEO_STICKER_DIR = path.join(__dirname, 'video-stickers');
+const VIDEO_STICKER_MAX_SEC = 15;
+
+function videoStickerTarget(rawName) {
+  const safe = (rawName || '').toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/^-+|-+$/g, '');
+  if (!safe) return null;
+  return { name: safe, file: path.join(VIDEO_STICKER_DIR, `${safe}.mp4`) };
+}
+
+function listVideoStickers() {
+  try {
+    return fs.readdirSync(VIDEO_STICKER_DIR)
+      .filter((f) => f.endsWith('.mp4'))
+      .map((f) => f.slice(0, -4))
+      .sort();
+  } catch (e) {
+    return [];
+  }
+}
+
+// Durasi media dalam detik (ffprobe), atau null kalau gagal
+function probeDurationSec(file) {
+  return new Promise((resolve) => {
+    execFile('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], (err, stdout) => {
+      if (err) return resolve(null);
+      const n = parseFloat((stdout || '').trim());
+      resolve(Number.isFinite(n) ? n : null);
+    });
+  });
+}
+
+// Olah video jadi stiker video: persegi 512x512 (crop tengah), maks 15
+// detik, video H.264 + audio AAC (suara dipertahankan).
+function processVideoSticker(input, output) {
+  return new Promise((resolve) => {
+    const vf = 'crop=min(iw\\,ih):min(iw\\,ih),scale=512:512,fps=30';
+    execFile('ffmpeg', ['-y', '-v', 'error', '-i', input, '-t', String(VIDEO_STICKER_MAX_SEC),
+      '-vf', vf, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '26', '-preset', 'veryfast',
+      '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', output], (err) => {
+      resolve(!err && fs.existsSync(output));
+    });
+  });
+}
+
+async function handleVideoSticker(msg, argsText) {
+  const args = (argsText || '').trim();
+  const parts = args.split(/\s+/).filter(Boolean);
+  const sub = (parts[0] || '').toLowerCase();
+
+  if (!args || sub === 'help') {
+    return '🎬 *Stiker Video Bersuara*\n' +
+      '*.vstiker simpan <nama>* — reply video untuk menyimpannya\n' +
+      '*.vstiker <nama>* — kirim stiker video (gambar + suara)\n' +
+      '*.vstiker list* — daftar stiker video tersimpan\n' +
+      '*.vstiker hapus <nama>* — hapus stiker video (khusus owner)\n\n' +
+      `Video diolah jadi persegi, maksimal ${VIDEO_STICKER_MAX_SEC} detik, suara tetap ada.`;
+  }
+  if (sub === 'list') {
+    const names = listVideoStickers();
+    if (names.length === 0) return 'Belum ada stiker video tersimpan. Reply video lalu ketik *.vstiker simpan <nama>*.';
+    return `🎬 *Stiker video tersimpan:*\n${names.map((n) => `• ${n}`).join('\n')}\n\nKirim dengan *.vstiker <nama>*`;
+  }
+  if (sub === 'simpan' || sub === 'save') {
+    const target = videoStickerTarget(parts.slice(1).join(' '));
+    if (!target) return 'Kasih nama dulu ya. Contoh: *.vstiker simpan ngakak*';
+    const mediaMsg = await findMediaMessage(msg);
+    if (!mediaMsg) return 'Caranya: *reply video* lalu ketik *.vstiker simpan <nama>*';
+    const media = await mediaMsg.downloadMedia();
+    if (!media || !media.data) return 'Gagal mengunduh videonya. Coba kirim ulang ya.';
+    if (!(media.mimetype || '').startsWith('video/')) return 'Itu bukan video. Reply sebuah video ya.';
+    fs.mkdirSync(VIDEO_STICKER_DIR, { recursive: true });
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wabot-vstik-'));
+    try {
+      const ext = ((media.mimetype.split('/')[1] || 'mp4').split(';')[0] || 'mp4').replace(/[^a-z0-9]/gi, '');
+      const rawFile = path.join(tmp, `in.${ext}`);
+      fs.writeFileSync(rawFile, Buffer.from(media.data, 'base64'));
+      const srcDur = await probeDurationSec(rawFile);
+      const ok = await processVideoSticker(rawFile, target.file);
+      if (!ok) {
+        if (fs.existsSync(target.file)) fs.rmSync(target.file);
+        return 'Gagal menyimpan: pengolahan video butuh *ffmpeg* terinstal di perangkat bot.';
+      }
+      log(`🎬 Stiker video disimpan: ${target.name}`);
+      const trimmed = srcDur && srcDur > VIDEO_STICKER_MAX_SEC
+        ? ` (dipotong dari ${Math.round(srcDur)} detik jadi ${VIDEO_STICKER_MAX_SEC} detik pertama)` : '';
+      return `Siap! Stiker video *${target.name}* tersimpan${trimmed}. Kirim kapan saja dengan *.vstiker ${target.name}*`;
+    } finally {
+      try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
+    }
+  }
+  if (sub === 'hapus' || sub === 'delete') {
+    const isOwner = config.ownerNumber &&
+      (msg.from === `${config.ownerNumber}@c.us` || (msg.author || '').startsWith(config.ownerNumber));
+    if (!isOwner) return 'Hapus stiker video cuma bisa dilakukan owner bot.';
+    const target = videoStickerTarget(parts.slice(1).join(' '));
+    if (!target) return 'Sebutkan namanya. Contoh: *.vstiker hapus ngakak*';
+    if (!fs.existsSync(target.file)) return `Stiker video *${target.name}* tidak ditemukan.`;
+    fs.rmSync(target.file);
+    return `Stiker video *${target.name}* dihapus.`;
+  }
+  // Default: kirim stiker video dengan nama itu
+  const target = videoStickerTarget(args);
+  if (!target) return 'Format tidak dikenali. Ketik *.vstiker* untuk bantuan.';
+  if (!fs.existsSync(target.file)) {
+    const names = listVideoStickers();
+    return `Stiker video *${target.name}* tidak ada.` + (names.length ? `\nYang tersimpan: ${names.join(', ')}` : '');
+  }
+  const data = fs.readFileSync(target.file).toString('base64');
+  const media = new MessageMedia('video/mp4', data, `${target.name}.mp4`);
+  await client.sendMessage(msg.from, media, {
+    quotedMessageId: msg.id._serialized,
+  });
+  log(`🎬 Stiker video terkirim: ${target.name} ke ${msg.from}`);
+  return null; // sudah dibalas langsung
+}
+
 const client = new Client({
   authStrategy: new LocalAuth(), // sesi tersimpan di .wwebjs_auth, QR cukup sekali
   puppeteer: {
@@ -722,6 +851,13 @@ client.on('message', async (msg) => {
     } else if (firstWord === '.audio') {
       // Perintah stiker audio membalas sendiri saat mengirim suara
       reply = await handleAudioSticker(msg, text.split(/\s+/).slice(1).join(' '));
+      if (reply === null) {
+        lastReplyAt.set(msg.from, Date.now());
+        return;
+      }
+    } else if (firstWord === '.vstiker' || firstWord === '.vsticker') {
+      // Perintah stiker video membalas sendiri saat mengirim video
+      reply = await handleVideoSticker(msg, text.split(/\s+/).slice(1).join(' '));
       if (reply === null) {
         lastReplyAt.set(msg.from, Date.now());
         return;
