@@ -5,7 +5,8 @@
 //        anti view-once (.vo), cuaca (.cuaca),
 //        jadwal sholat (.jadwalsholat), pengingat (.ingetin),
 //        tag semua anggota grup (.tagall), stiker audio (.audio),
-//        stiker video bersuara (.vstiker),
+//        stiker video bersuara (.vstiker), stiker bersuara (.s video,
+//        .sb, .setaudio, .resetaudio, .getaudio),
 //        broadcast promosi ke semua grup (.bc, khusus owner),
 //        pesan terjadwal, dan log sederhana.
 // Jalankan: npm install  lalu  npm start  lalu scan QR di HP
@@ -17,6 +18,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
@@ -203,7 +205,15 @@ async function handleCommand(msg, text) {
 // Foto -> stiker biasa, video/gif pendek -> stiker animasi
 // (stiker video butuh ffmpeg terinstal di server).
 async function handleSticker(msg, text) {
-  const customName = text.trim().split(/\s+/).slice(1).join(' ');
+  // Nama pack & author: ".s Nama Bebas" atau ".s Nama Pack | Nama Author"
+  const rawArgs = text.trim().split(/\s+/).slice(1).join(' ');
+  let customName = rawArgs;
+  let customAuthor = config.stickerAuthor;
+  if (rawArgs.includes('|')) {
+    const [n, a] = rawArgs.split('|').map((s) => s.trim());
+    customName = n || '';
+    if (a) customAuthor = a;
+  }
 
   const mediaMsg = await findMediaMessage(msg);
   if (!mediaMsg) {
@@ -221,7 +231,7 @@ async function handleSticker(msg, text) {
   await client.sendMessage(msg.from, media, {
     sendMediaAsSticker: true,
     stickerName: customName || config.stickerName,
-    stickerAuthor: config.stickerAuthor,
+    stickerAuthor: customAuthor,
     quotedMessageId: msg.id._serialized,
   });
   log(`🏷️ Stiker ${isVideo ? 'video' : 'foto'} dikirim ke ${msg.from}`);
@@ -742,6 +752,236 @@ async function handleVideoSticker(msg, argsText) {
   return null; // sudah dibalas langsung
 }
 
+// ---------- STIKER BERSUARA (.s untuk video, .sb, .setaudio, .getaudio) ----------
+// WhatsApp resmi MULAI merilis "stiker bersuara" (beta Android/iOS, akhir
+// Nov 2026): stiker animasi dari video + trek audio yang diputar saat
+// ikon audio diketuk. Tapi library whatsapp-web.js belum mendukung
+// format resmi itu, jadi di bot ini stiker bersuara ditiru dengan video
+// persegi pendek bersuara — gambar + suara jalan bersama di chat.
+// Perintah:
+// .s                 -> reply video: jadi stiker bersuara (suara asli video)
+// .s 5 / .s 0:12     -> ambil mulai detik ke-5 / ke-12 (maks 10 detik)
+// .s full            -> tanpa crop (video utuh di atas latar buram)
+// .sb                -> stiker biasa TANPA suara (perilaku .s lama)
+// .s Nama | Author   -> nama pack & author (untuk stiker biasa / .sb)
+// .setaudio          -> reply VN/audio/video: tempel audionya untuk .s berikutnya
+// .resetaudio        -> lepas audio tempelan
+// .getaudio          -> reply video/stiker bersuara: ambil audionya
+// Foto/stiker + audio (dari .setaudio, atau dari audio/video yang
+// di-reply bersamaan) juga jadi stiker bersuara: gambarnya jadi video
+// dengan suara menempel. Membalas VN/audio dengan .s saja = .setaudio.
+// Di DM, video yang dikirim tanpa caption otomatis jadi stiker bersuara
+// (atur di config: autoStickerBersuaraDM).
+const SOUND_STICKER_MAX_SEC = 10;
+const PENDING_AUDIO_DIR = path.join(__dirname, 'audio-pending');
+const pendingAudio = new Map(); // kunci hash chat+pengirim -> path file ogg
+
+function pendingAudioKey(msg) {
+  const raw = `${msg.from}|${msg.author || msg.from}`;
+  return crypto.createHash('md5').update(raw).digest('hex').slice(0, 16);
+}
+
+// Parse detik mulai: "5" -> 5, "0:12" -> 12, "1:05" -> 65. null kalau bukan waktu.
+function parseStartSec(str) {
+  const s = (str || '').trim();
+  if (/^\d+$/.test(s)) return parseInt(s, 10);
+  const m = s.match(/^(\d+):([0-5]\d)$/);
+  if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  return null;
+}
+
+// Ambil audio dari sebuah pesan media (audio/VN/video) sebagai file .ogg
+// di tmpDir. Kembalikan path file, atau null kalau bukan audio/video / gagal.
+async function getAudioFileFromMsg(mediaMsgObj, tmpDir) {
+  const m = await mediaMsgObj.downloadMedia();
+  if (!m || !m.data) return null;
+  const mime = m.mimetype || '';
+  if (!(mime.startsWith('audio/') || mime.startsWith('video/'))) return null;
+  const ext = ((mime.split('/')[1] || 'bin').split(';')[0] || 'bin').replace(/[^a-z0-9]/gi, '');
+  const raw = path.join(tmpDir, `audiosrc.${ext}`);
+  fs.writeFileSync(raw, Buffer.from(m.data, 'base64'));
+  const out = path.join(tmpDir, 'audio.ogg');
+  if (mime.includes('ogg')) { fs.copyFileSync(raw, out); return out; }
+  const ok = await convertToOgg(raw, out);
+  return ok ? out : null;
+}
+
+// Bangun stiker bersuara dari video: persegi 512x512 (crop tengah, atau
+// 'full' = video utuh di atas latar buram), maks 10 detik. Audio asli
+// dipertahankan, atau diganti audioFile kalau diberikan.
+function buildSoundStickerFromVideo(input, output, { startSec = 0, full = false, audioFile = null } = {}) {
+  return new Promise((resolve) => {
+    const args = ['-y', '-v', 'error'];
+    if (startSec > 0) args.push('-ss', String(startSec));
+    args.push('-i', input);
+    if (audioFile) args.push('-i', audioFile);
+    if (full) {
+      args.push('-filter_complex',
+        '[0:v]split[a][b];[a]scale=512:512:force_original_aspect_ratio=increase,crop=512:512,gblur=sigma=24[bg];[b]scale=512:512:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,fps=30[vout]',
+        '-map', '[vout]', '-map', audioFile ? '1:a:0?' : '0:a:0?');
+    } else {
+      args.push('-vf', 'crop=min(iw\\,ih):min(iw\\,ih),scale=512:512,fps=30');
+      if (audioFile) args.push('-map', '0:v:0', '-map', '1:a:0?');
+    }
+    args.push('-t', String(SOUND_STICKER_MAX_SEC),
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '26', '-preset', 'veryfast',
+      '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', output);
+    execFile('ffmpeg', args, (err) => resolve(!err && fs.existsSync(output)));
+  });
+}
+
+// Bangun stiker bersuara dari gambar/stiker + audio: gambar jadi video
+// (stiker animasi WebP tetap bergerak & diloop) selama bunyi audio,
+// maksimal 10 detik.
+async function buildSoundStickerFromImage(input, isAnimatedWebp, audioFile, output) {
+  const dur = (await probeDurationSec(audioFile)) || SOUND_STICKER_MAX_SEC;
+  const t = Math.min(dur, SOUND_STICKER_MAX_SEC);
+  return new Promise((resolve) => {
+    const args = ['-y', '-v', 'error'];
+    if (isAnimatedWebp) args.push('-stream_loop', '-1', '-i', input);
+    else args.push('-loop', '1', '-framerate', '30', '-i', input);
+    args.push('-i', audioFile, '-t', String(t),
+      '-vf', 'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:black,fps=30,format=yuv420p',
+      '-c:v', 'libx264', '-crf', '26', '-preset', 'veryfast',
+      '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', output);
+    execFile('ffmpeg', args, (err) => resolve(!err && fs.existsSync(output)));
+  });
+}
+
+// Unduh video visualMsg, olah jadi stiker bersuara di tmpDir (milik
+// pemanggil), lalu kirim. Kembalikan null kalau terkirim, teks error kalau gagal.
+async function sendSoundStickerFromVideo(msg, visualMsg, { startSec = 0, full = false, audioFile = null, tmpDir }) {
+  const media = await visualMsg.downloadMedia();
+  if (!media || !media.data) return 'Gagal mengunduh videonya. Coba kirim ulang ya.';
+  const ext = ((media.mimetype.split('/')[1] || 'mp4').split(';')[0] || 'mp4').replace(/[^a-z0-9]/gi, '');
+  const raw = path.join(tmpDir, `vid.${ext}`);
+  fs.writeFileSync(raw, Buffer.from(media.data, 'base64'));
+  const out = path.join(tmpDir, 'sound-sticker.mp4');
+  const ok = await buildSoundStickerFromVideo(raw, out, { startSec, full, audioFile });
+  if (!ok) return 'Gagal membuat stiker bersuara: pengolahan video butuh *ffmpeg* terinstal di perangkat bot.';
+  const data = fs.readFileSync(out).toString('base64');
+  await client.sendMessage(msg.from, new MessageMedia('video/mp4', data, 'stiker-bersuara.mp4'), {
+    quotedMessageId: msg.id._serialized,
+  });
+  log(`🔊🎬 Stiker bersuara terkirim ke ${msg.from}`);
+  return null;
+}
+
+// Perintah .setaudio — reply VN/audio/video untuk menempelkan audionya.
+// Audio tempelan dipakai .s berikutnya dari pengirim yang sama di chat
+// yang sama, sampai dilepas dengan .resetaudio (atau bot restart).
+async function handleSetAudio(msg, srcMsg) {
+  const mediaMsg = srcMsg || (await findMediaMessage(msg));
+  if (!mediaMsg) return 'Caranya: *reply VN/audio/video* lalu ketik *.setaudio*';
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wabot-setaudio-'));
+  try {
+    const f = await getAudioFileFromMsg(mediaMsg, tmp);
+    if (!f) return 'Itu bukan audio/video, atau gagal mengambil audionya (konversi butuh *ffmpeg* terinstal).';
+    fs.mkdirSync(PENDING_AUDIO_DIR, { recursive: true });
+    const key = pendingAudioKey(msg);
+    const dest = path.join(PENDING_AUDIO_DIR, `${key}.ogg`);
+    fs.copyFileSync(f, dest);
+    pendingAudio.set(key, dest);
+    log(`🔊 Audio tempelan diatur untuk ${msg.from}`);
+    return 'Siap! Audio ditempel 🔊\n' +
+      'Sekarang kirim/reply foto, stiker, atau video dengan *.s* — hasilnya stiker bersuara dengan audio ini.\n' +
+      'Ketik *.resetaudio* untuk melepas tempelan.';
+  } finally {
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
+  }
+}
+
+// Perintah .resetaudio — lepas audio tempelan.
+async function handleResetAudio(msg) {
+  const key = pendingAudioKey(msg);
+  const dest = pendingAudio.get(key);
+  pendingAudio.delete(key);
+  if (dest) { try { fs.rmSync(dest); } catch (e) {} }
+  return dest ? 'Audio tempelan dilepas. *.s* kembali memakai suara asli.' : 'Tidak ada audio tempelan yang aktif.';
+}
+
+// Perintah .getaudio — reply video/stiker bersuara untuk mengambil
+// audionya; dikirim balik sebagai pesan suara.
+async function handleGetAudio(msg) {
+  const mediaMsg = await findMediaMessage(msg);
+  if (!mediaMsg) return 'Caranya: *reply video/stiker bersuara* lalu ketik *.getaudio*';
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wabot-getaudio-'));
+  try {
+    const f = await getAudioFileFromMsg(mediaMsg, tmp);
+    if (!f) return 'Tidak ada audio yang bisa diambil dari media itu (stiker biasa memang tidak bersuara), atau konversi gagal (butuh *ffmpeg*).';
+    const data = fs.readFileSync(f).toString('base64');
+    await client.sendMessage(msg.from, new MessageMedia('audio/ogg; codecs=opus', data, 'audio.ogg'), {
+      sendAudioAsVoice: true,
+      quotedMessageId: msg.id._serialized,
+    });
+    log(`🔊 Audio diekstrak dan dikirim ke ${msg.from}`);
+    return null; // sudah dibalas langsung
+  } finally {
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
+  }
+}
+
+// Perintah .s — router stiker bersuara:
+// - video (sendiri / di-reply) -> stiker bersuara dari video itu
+// - foto/stiker + audio (tempelan .setaudio / audio di pesan sebelah)
+//   -> stiker bersuara dari gambar + audio
+// - foto/stiker tanpa audio -> stiker biasa (handleSticker)
+// - membalas VN/audio saja dengan .s -> sama dengan .setaudio
+async function handleStickerCommand(msg, text) {
+  const argsText = text.trim().split(/\s+/).slice(1).join(' ');
+  let quoted = null;
+  if (msg.hasQuotedMsg) {
+    try { quoted = await msg.getQuotedMessage(); } catch (e) { quoted = null; }
+  }
+  const self = msg.hasMedia ? msg : null;
+  const quot = quoted && quoted.hasMedia ? quoted : null;
+  const isVisual = (m) => !!m && ['image', 'video', 'sticker'].includes(m.type);
+  const visualMsg = isVisual(self) ? self : (isVisual(quot) ? quot : null);
+  const audioSide = [self, quot].find((m) => m && m !== visualMsg && ['audio', 'ptt', 'video'].includes(m.type)) || null;
+
+  if (!visualMsg) {
+    if (audioSide) return handleSetAudio(msg, audioSide);
+    return handleSticker(msg, text); // tampilkan petunjuk pemakaian
+  }
+
+  const key = pendingAudioKey(msg);
+  const pending = pendingAudio.get(key);
+  const hasPending = !!pending && fs.existsSync(pending);
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wabot-ss-'));
+  try {
+    let audioFile = null;
+    if (hasPending) audioFile = pending;
+    else if (audioSide) audioFile = await getAudioFileFromMsg(audioSide, tmp);
+
+    if (visualMsg.type === 'video') {
+      const startSec = parseStartSec(argsText) || 0;
+      const full = /(^|\s)full(\s|$)/i.test(argsText);
+      return await sendSoundStickerFromVideo(msg, visualMsg, { startSec, full, audioFile, tmpDir: tmp });
+    }
+
+    // image / sticker
+    if (!audioFile) return handleSticker(msg, text); // stiker biasa
+    const media = await visualMsg.downloadMedia();
+    if (!media || !media.data) return 'Gagal mengunduh medianya. Coba lagi ya.';
+    const mime = media.mimetype || '';
+    const ext = ((mime.split('/')[1] || 'png').split(';')[0] || 'png').replace(/[^a-z0-9]/gi, '');
+    const raw = path.join(tmp, `img.${ext}`);
+    fs.writeFileSync(raw, Buffer.from(media.data, 'base64'));
+    const out = path.join(tmp, 'sound-sticker.mp4');
+    const ok = await buildSoundStickerFromImage(raw, mime === 'image/webp', audioFile, out);
+    if (!ok) return 'Gagal membuat stiker bersuara: pengolahan media butuh *ffmpeg* terinstal di perangkat bot.';
+    const data = fs.readFileSync(out).toString('base64');
+    await client.sendMessage(msg.from, new MessageMedia('video/mp4', data, 'stiker-bersuara.mp4'), {
+      quotedMessageId: msg.id._serialized,
+    });
+    log(`🔊🎬 Stiker bersuara (gambar+audio) terkirim ke ${msg.from}`);
+    return null;
+  } finally {
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
+  }
+}
+
 const client = new Client({
   authStrategy: new LocalAuth(), // sesi tersimpan di .wwebjs_auth, QR cukup sekali
   puppeteer: {
@@ -807,6 +1047,24 @@ client.on('message', async (msg) => {
       return;
     }
 
+    // Stiker bersuara otomatis di DM: video yang dikirim tanpa caption
+    // langsung jadi stiker bersuara (atur di config: autoStickerBersuaraDM).
+    if (config.autoStickerBersuaraDM && !isGroup && msg.hasMedia && msg.type === 'video' && !text) {
+      if (!isOnCooldown(msg.from)) {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wabot-ss-auto-'));
+        try {
+          const r = await sendSoundStickerFromVideo(msg, msg, { tmpDir: tmp });
+          if (typeof r === 'string') await msg.reply(r);
+          lastReplyAt.set(msg.from, Date.now());
+        } catch (err) {
+          log('❌ Gagal stiker bersuara otomatis:', err.message);
+        } finally {
+          try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
+        }
+      }
+      return;
+    }
+
     if (!text) return; // abaikan pesan tanpa teks (gambar/stiker/dokumen)
     if (isOnCooldown(msg.from)) return;
 
@@ -815,8 +1073,26 @@ client.on('message', async (msg) => {
     let reply = null;
     const firstWord = text.split(/\s+/)[0].toLowerCase();
     if (firstWord === '.s' || firstWord === '.sticker' || firstWord === '.stiker') {
-      // Perintah stiker membalas sendiri (kirim media), jadi selesai di sini
+      // .s: video jadi stiker bersuara; foto/stiker jadi stiker biasa
+      // (atau bersuara kalau ada audio tempelan / audio di pesan sebelah)
+      reply = await handleStickerCommand(msg, text);
+      if (reply === null) {
+        lastReplyAt.set(msg.from, Date.now());
+        return;
+      }
+    } else if (firstWord === '.sb') {
+      // .sb: stiker biasa tanpa suara (perilaku .s lama)
       reply = await handleSticker(msg, text);
+      if (reply === null) {
+        lastReplyAt.set(msg.from, Date.now());
+        return;
+      }
+    } else if (firstWord === '.setaudio') {
+      reply = await handleSetAudio(msg);
+    } else if (firstWord === '.resetaudio') {
+      reply = await handleResetAudio(msg);
+    } else if (firstWord === '.getaudio') {
+      reply = await handleGetAudio(msg);
       if (reply === null) {
         lastReplyAt.set(msg.from, Date.now());
         return;

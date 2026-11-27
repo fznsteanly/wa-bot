@@ -6,7 +6,8 @@ Bot WhatsApp berbasis [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-
 
 - **Balas otomatis** berdasarkan kata kunci (atur di `config.js`)
 - **Perintah**: `!menu`, `!ping`, `!jam`, `!owner`
-- **Stiker**: reply foto/video lalu ketik `.s` — bot mengubahnya jadi stiker (video pendek jadi stiker animasi)
+- **Stiker**: reply foto/video lalu ketik `.s` — foto jadi stiker biasa; **video jadi stiker bersuara** (lihat di bawah)
+- **Stiker bersuara**: `.s` untuk video (suara asli, maks 10 detik, bisa pilih detik mulai), `.setaudio` untuk menempel audio ke foto/stiker, `.getaudio` untuk ekstrak audio
 - **Stiker → foto**: reply stiker lalu ketik `.toimg`
 - **Anti view-once**: reply foto/video sekali lihat lalu ketik `.vo` — diubah jadi foto/video biasa
 - **Stiker audio**: `.audio` — simpan pesan suara dengan nama, kirim ulang sebagai pesan suara kapan pun
@@ -32,6 +33,17 @@ Stiker video (animasi) butuh `ffmpeg` terinstal di server:
 ```bash
 sudo apt update && sudo apt install -y ffmpeg
 ```
+
+## Stiker bersuara (`.s` untuk video, `.setaudio`, `.getaudio`)
+
+WhatsApp resmi **mulai merilis stiker bersuara** (beta Android/iOS, akhir November 2026): stiker animasi dari video + trek audio yang diputar saat ikon audio diketuk. Library whatsapp-web.js yang dipakai bot ini **belum mendukung format resmi itu**, jadi bot menirunya dengan **video persegi pendek bersuara** — gambar dan suara jalan bersama di chat. Semua pengolahan butuh `ffmpeg`.
+
+- **Video → stiker bersuara**: reply video lalu ketik `.s` (suara asli video, maks 10 detik). Di DM, video yang dikirim **tanpa caption** otomatis jadi stiker bersuara (matikan lewat `autoStickerBersuaraDM` di `config.js`).
+- **Pilih detik mulai**: `.s 5` (mulai detik ke-5) atau `.s 0:12` (mulai 0:12).
+- **Tanpa crop**: `.s full` — video utuh di atas latar buram.
+- **Stiker biasa tanpa suara**: `.sb` (perilaku `.s` lama). Nama pack custom: `.s Nama Pack | Nama Author` (berlaku untuk stiker biasa).
+- **Foto/stiker + audio**: reply VN/audio/video dengan `.setaudio` untuk menempel audionya, lalu kirim/reply foto atau stiker dengan `.s` — hasilnya video bersuara dengan gambar itu. Cara cepat: kirim foto dengan caption `.s` sambil me-reply sebuah VN/audio, atau balas VN/audio dengan `.s` saja (sama dengan `.setaudio`). `.resetaudio` melepas tempelan.
+- **Ekstrak audio**: reply video/stiker bersuara lalu ketik `.getaudio` — audionya dikirim sebagai pesan suara.
 
 ## Anti view-once (foto sekali lihat → foto biasa)
 

@@ -41,6 +41,12 @@ module.exports = {
   stickerName: '𝗯𝗼𝘁 𝗯𝘆 𝗳𝘇𝗻',
   stickerAuthor: 'wa-bot',
 
+  // ---------- STIKER BERSUARA ----------
+  // Di DM (chat pribadi), video yang dikirim TANPA caption otomatis
+  // dijadikan stiker bersuara oleh bot. Matikan (false) kalau bot cukup
+  // bereaksi saat diperintah .s saja.
+  autoStickerBersuaraDM: true,
+
   // ---------- ATURAN BALAS OTOMATIS (kata kunci -> balasan) ----------
   // Bot cek apakah pesan MENGANDUNG kata kunci (tidak peduli huruf besar/kecil).
   // Aturan pertama yang cocok yang dipakai.
@@ -92,7 +98,11 @@ module.exports = {
     '*!jam* — lihat jam sekarang\n' +
     '*!owner* — info kontak owner\n\n' +
     '🎬 *Media*\n' +
-    '*.s* — ubah foto/video jadi stiker (reply foto lalu ketik *.s*)\n' +
+    '*.s* — buat stiker (video jadi stiker bersuara; foto jadi stiker biasa)\n' +
+    '*.sb* — buat stiker biasa tanpa suara\n' +
+    '*.setaudio* — tempel audio untuk stiker bersuara (reply VN/audio)\n' +
+    '*.resetaudio* — lepas audio tempelan\n' +
+    '*.getaudio* — ambil audio dari video/stiker bersuara\n' +
     '*.toimg* — ubah stiker jadi foto lagi\n' +
     '*.vo* — ubah foto/video sekali lihat jadi foto/video biasa\n' +
     '*.audio simpan <nama>* — simpan pesan suara jadi stiker audio\n' +

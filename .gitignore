@@ -3,4 +3,5 @@ node_modules/
 .wwebjs_cache/
 audio-stickers/
 video-stickers/
+audio-pending/
 *.log
